@@ -64,7 +64,7 @@ read_conf_file(const char *fn)
     config_load_file(root, fn);
 
     if (root->first_child == NULL) {
-        ALOGE("Could not read config file %s", fn);
+        LOGE("Could not read config file %s", fn);
         return NULL;
     }
 
@@ -89,7 +89,7 @@ exec_cmd(const char *cmd, ...) /* const char *arg, ...) */
     va_end(ap);
 
     if (!(outbuf = malloc(size + 1))) {
-        ALOGE("Can't allocate memory to exec cmd");
+        LOGE("Can't allocate memory to exec cmd");
         return -1;
     }
 
@@ -102,15 +102,15 @@ exec_cmd(const char *cmd, ...) /* const char *arg, ...) */
     }
     va_end(ap);
 
-    ALOGI("Executing: %s", outbuf);
+    LOGI("Executing: %s", outbuf);
     rv = system(outbuf);
     free(outbuf);
     if (rv < 0) {
-        ALOGI("Error while trying to execute '%s'", cmd);
+        LOGI("Error while trying to execute '%s'", cmd);
         return -1;
     }
     rv = WEXITSTATUS(rv);
-    ALOGI("Done executing %s (%d)", outbuf, rv);
+    LOGI("Done executing %s (%d)", outbuf, rv);
     return rv;
 }
 
@@ -122,15 +122,15 @@ do_fsck(const char *dst, int force)
     const char *opts = force ? "-fy" : "-y";
 
 
-    ALOGI("Running e2fsck... (force=%d) This MAY take a while.", force);
+    LOGI("Running e2fsck... (force=%d) This MAY take a while.", force);
     if ((rv = exec_cmd(E2FSCK_BIN, "-C 0", opts, dst, NULL)) < 0)
         return 1;
     if (rv >= 4) {
-        ALOGE("Error while running e2fsck: %d", rv);
+        LOGE("Error while running e2fsck: %d", rv);
         return 1;
     }
     sync();
-    ALOGI("e2fsck succeeded (exit code: %d)", rv);
+    LOGI("e2fsck succeeded (exit code: %d)", rv);
 
     return 0;
 }
@@ -156,7 +156,7 @@ process_ext2_image(const char *dst, const char *src, uint32_t flags, int test)
     if ((rv = exec_cmd(TUNE2FS_BIN, "-C", "1", dst, NULL)) < 0)
         return 1;
     if (rv) {
-        ALOGE("Error while running tune2fs: %d", rv);
+        LOGE("Error while running tune2fs: %d", rv);
         return 1;
     }
 
@@ -165,7 +165,7 @@ process_ext2_image(const char *dst, const char *src, uint32_t flags, int test)
         if ((rv = exec_cmd(RESIZE2FS_BIN, "-F", dst, NULL)) < 0)
             return 1;
         if (rv) {
-            ALOGE("Error while running resize2fs: %d", rv);
+            LOGE("Error while running resize2fs: %d", rv);
             return 1;
         }
         sync();
@@ -178,7 +178,7 @@ process_ext2_image(const char *dst, const char *src, uint32_t flags, int test)
         if ((rv = exec_cmd(TUNE2FS_BIN, "-j", dst, NULL)) < 0)
             return 1;
         if (rv) {
-            ALOGE("Error while running tune2fs: %d", rv);
+            LOGE("Error while running tune2fs: %d", rv);
             return 1;
         }
         sync();
@@ -215,19 +215,19 @@ process_image_node(cnode *img, struct disk_info *dinfo, int test)
     /* process the 'partition' image parameter */
     if ((tmp = config_str(img, "partition", NULL)) != NULL) {
         if (offset != (loff_t)-1) {
-            ALOGE("Cannot specify the partition name AND an offset for %s",
+            LOGE("Cannot specify the partition name AND an offset for %s",
                  img->name);
             goto fail;
         }
 
         if (!(pinfo = find_part(dinfo, tmp))) {
-            ALOGE("Cannot find partition %s while processing %s",
+            LOGE("Cannot find partition %s while processing %s",
                  tmp, img->name);
             goto fail;
         }
 
         if (!(dest_part = find_part_device(dinfo, pinfo->name))) {
-            ALOGE("Could not get the device name for partition %s while"
+            LOGE("Could not get the device name for partition %s while"
                  " processing image %s", pinfo->name, img->name);
             goto fail;
         }
@@ -240,10 +240,10 @@ process_image_node(cnode *img, struct disk_info *dinfo, int test)
         char vol_lbl[16]; /* ext2/3 has a 16-char volume label */
 
         if (!pinfo) {
-            ALOGE("Target partition required for mkfs for '%s'", img->name);
+            LOGE("Target partition required for mkfs for '%s'", img->name);
             goto fail;
         } else if (filename) {
-            ALOGE("Providing filename and mkfs parameters is meaningless");
+            LOGE("Providing filename and mkfs parameters is meaningless");
             goto fail;
         }
 
@@ -254,7 +254,7 @@ process_image_node(cnode *img, struct disk_info *dinfo, int test)
         else if (!strcmp(tmp, "ext3"))
             journal_opts = "-j";
         else {
-            ALOGE("Unknown filesystem type for mkfs: %s", tmp);
+            LOGE("Unknown filesystem type for mkfs: %s", tmp);
             goto fail;
         }
 
@@ -267,7 +267,7 @@ process_image_node(cnode *img, struct disk_info *dinfo, int test)
         if (rv < 0)
             goto fail;
         else if (rv > 0) {
-            ALOGE("Error while running mke2fs: %d", rv);
+            LOGE("Error while running mke2fs: %d", rv);
             goto fail;
         }
         sync();
@@ -279,7 +279,7 @@ process_image_node(cnode *img, struct disk_info *dinfo, int test)
     /* since we didn't mkfs above, all the rest of the options assume
      * there's a filename involved */
     if (!filename) {
-        ALOGE("Filename is required for image %s", img->name);
+        LOGE("Filename is required for image %s", img->name);
         goto fail;
     }
 
@@ -288,7 +288,7 @@ process_image_node(cnode *img, struct disk_info *dinfo, int test)
         char *flagstr, *flagstr_orig;
 
         if (!(flagstr = flagstr_orig = strdup(tmp))) {
-            ALOGE("Cannot allocate memory for dup'd flags string");
+            LOGE("Cannot allocate memory for dup'd flags string");
             goto fail;
         }
         while ((tmp = strsep(&flagstr, ","))) {
@@ -297,7 +297,7 @@ process_image_node(cnode *img, struct disk_info *dinfo, int test)
             else if (!strcmp(tmp, "addjournal"))
                 flags |= INSTALL_FLAG_ADDJOURNAL;
             else {
-                ALOGE("Unknown flag '%s' for image %s", tmp, img->name);
+                LOGE("Unknown flag '%s' for image %s", tmp, img->name);
                 free(flagstr_orig);
                 goto fail;
             }
@@ -307,7 +307,7 @@ process_image_node(cnode *img, struct disk_info *dinfo, int test)
 
     /* process the 'type' image parameter */
     if (!(tmp = config_str(img, "type", NULL))) {
-        ALOGE("Type is required for image %s", img->name);
+        LOGE("Type is required for image %s", img->name);
         goto fail;
     } else if (!strcmp(tmp, "raw")) {
         type = INSTALL_IMAGE_RAW;
@@ -318,19 +318,19 @@ process_image_node(cnode *img, struct disk_info *dinfo, int test)
     } else if (!strcmp(tmp, "ext4")) {
         type = INSTALL_IMAGE_EXT4;
     } else {
-        ALOGE("Unknown image type '%s' for image %s", tmp, img->name);
+        LOGE("Unknown image type '%s' for image %s", tmp, img->name);
         goto fail;
     }
 
     /* at this point we MUST either have a partition in 'pinfo' or a raw
      * 'offset', otherwise quit */
     if (!pinfo && (offset == (loff_t)-1)) {
-        ALOGE("Offset to write into the disk is unknown for %s", img->name);
+        LOGE("Offset to write into the disk is unknown for %s", img->name);
         goto fail;
     }
 
     if (!pinfo && (type != INSTALL_IMAGE_RAW)) {
-        ALOGE("Only raw images can specify direct offset on the disk. Please"
+        LOGE("Only raw images can specify direct offset on the disk. Please"
              " specify the target partition name instead. (%s)", img->name);
         goto fail;
     }
@@ -344,7 +344,7 @@ process_image_node(cnode *img, struct disk_info *dinfo, int test)
         case INSTALL_IMAGE_EXT3:
             /* makes the error checking in the imager function easier */
             if (flags & INSTALL_FLAG_ADDJOURNAL) {
-                ALOGW("addjournal flag is meaningless for ext3 images");
+                LOGW("addjournal flag is meaningless for ext3 images");
                 flags &= ~INSTALL_FLAG_ADDJOURNAL;
             }
             /* ...fall through... */
@@ -358,7 +358,7 @@ process_image_node(cnode *img, struct disk_info *dinfo, int test)
             break;
 
         default:
-            ALOGE("Unknown image type: %d", type);
+            LOGE("Unknown image type: %d", type);
             goto fail;
     }
 
@@ -418,12 +418,12 @@ main(int argc, char *argv[])
     if (inst_data_dev && !dump) {
         struct stat filestat;
 
-        ALOGI("Waiting for device: %s", inst_data_dev);
+        LOGI("Waiting for device: %s", inst_data_dev);
         while (stat(inst_data_dev, &filestat))
             sleep(1);
-        ALOGI("Device %s ready", inst_data_dev);
+        LOGI("Device %s ready", inst_data_dev);
         if (mount(inst_data_dev, inst_data_dir, data_fstype, MS_RDONLY, NULL)) {
-            ALOGE("Could not mount %s on %s as %s", inst_data_dev, inst_data_dir,
+            LOGE("Could not mount %s on %s as %s", inst_data_dev, inst_data_dir,
                  data_fstype);
             return 1;
         }
@@ -431,13 +431,13 @@ main(int argc, char *argv[])
 
     /* Read and process the disk configuration */
     if (!(device_disk_info = load_diskconfig(disk_conf_file, NULL))) {
-        ALOGE("Errors encountered while loading disk conf file %s",
+        LOGE("Errors encountered while loading disk conf file %s",
              disk_conf_file);
         return 1;
     }
 
     if (process_disk_config(device_disk_info)) {
-        ALOGE("Errors encountered while processing disk config from %s",
+        LOGE("Errors encountered while processing disk config from %s",
              disk_conf_file);
         return 1;
     }
@@ -458,14 +458,14 @@ main(int argc, char *argv[])
 
     /* Now process the installer config file and write the images to disk */
     if (!(images = config_find(config, "images"))) {
-        ALOGE("Invalid configuration file %s. Missing 'images' section",
+        LOGE("Invalid configuration file %s. Missing 'images' section",
              inst_conf_file);
         return 1;
     }
 
     for (img = images->first_child; img; img = img->next) {
         if (process_image_node(img, device_disk_info, test)) {
-            ALOGE("Unable to write data to partition. Try running 'installer' again.");
+            LOGE("Unable to write data to partition. Try running 'installer' again.");
             return 1;
         }
         ++cnt;
@@ -481,7 +481,7 @@ main(int argc, char *argv[])
     if (apply_disk_config(device_disk_info, test))
         return 1;
 
-    ALOGI("Done processing installer config. Configured %d images", cnt);
-    ALOGI("Type 'reboot' or reset to run new image");
+    LOGI("Done processing installer config. Configured %d images", cnt);
+    LOGI("Type 'reboot' or reset to run new image");
     return 0;
 }

@@ -1,6 +1,7 @@
 LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
+
 ifeq ($(TARGET_USE_DISKINSTALLER),true)
 
 LOCAL_SRC_FILES := \
@@ -24,4 +25,3 @@ include $(BUILD_EXECUTABLE)
 
 include $(call first-makefiles-under,$(LOCAL_PATH))
 endif
-
