@@ -246,24 +246,30 @@ $(INSTALLED_ANDROID_IMAGE_SYSTEM_TARGET): \
 		inst_sdcard=$(MITRE_INSTALLED_SDCARD);
 	@echo "Done with bootable android system-disk image -[ $@ ]-"
 
-$(INSTALLED_ANDROID_IMAGE_DATA_TARGET): \
-					$(INSTALLED_USERDATAIMAGE_TARGET) \
-					$(INSTALLED_CACHEIMAGE_TARGET) \
-					$(grub_bin) \
-					$(edit_mbr) \
-					$(android_data_layout)
-	@echo "Creating bootable android data-disk image: $@"
-	@rm -f $@
-	$(hide) cat $(grub_bin) > $@
-	@echo $(edit_mbr) -l $(android_data_layout) -i $@ \
-		inst_data=$(INSTALLED_USERDATAIMAGE_TARGET) \
-		inst_cache=$(MITRE_INSTALLED_CACHE)
-		#inst_cache=$(INSTALLED_CACHEIMAGE_TARGET)
-	$(hide) $(edit_mbr) -l $(android_data_layout) -i $@ \
-		inst_data=$(INSTALLED_USERDATAIMAGE_TARGET) \
-		inst_cache=$(MITRE_INSTALLED_CACHE)
-	@echo "Done with bootable android data-disk image -[ $@ ]-"
+#$(INSTALLED_ANDROID_IMAGE_DATA_TARGET): \
+#					$(INSTALLED_USERDATAIMAGE_TARGET) \
+#					$(INSTALLED_CACHEIMAGE_TARGET) \
+#					$(grub_bin) \
+#					$(edit_mbr) \
+#					$(android_data_layout)
+#	@echo "Creating bootable android data-disk image: $@"
+#	@rm -f $@
+#	$(hide) cat $(grub_bin) > $@
+#	@echo $(edit_mbr) -l $(android_data_layout) -i $@ \
+#		inst_data=$(INSTALLED_USERDATAIMAGE_TARGET) \
+#		inst_cache=$(MITRE_INSTALLED_CACHE)
+#		#inst_cache=$(INSTALLED_CACHEIMAGE_TARGET)
+#	$(hide) $(edit_mbr) -l $(android_data_layout) -i $@ \
+#		inst_data=$(INSTALLED_USERDATAIMAGE_TARGET) \
+#		inst_cache=$(MITRE_INSTALLED_CACHE)
+#	@echo "Done with bootable android data-disk image -[ $@ ]-"
 
+$(INSTALLED_ANDROID_IMAGE_DATA_TARGET): device/mitre/svmp/data-disk-blanks/android_data_disk_4G.img.tar.gz
+	@echo "Decompressing android data-disk image: $@"
+	@rm -f $@
+	$(hide) tar xzf $< -C $(PRODUCT_OUT)
+	$(hide) mv $(PRODUCT_OUT)/android_data_disk_4G.img $(PRODUCT_OUT)/android_data_disk.img
+	@echo "Done with bootable android data-disk image -[ $@ ]-"
 
 
 ######################################################################
@@ -303,10 +309,18 @@ $(INSTALLED_VMWARE_SYSTEM_DISK_IMAGE_TARGET): $(INSTALLED_ANDROID_IMAGE_SYSTEM_T
 	@echo "Done with VMWARE bootable system-disk image -[ $@ ]-"
 
 INSTALLED_VBOX_DATA_DISK_IMAGE_TARGET := $(PRODUCT_OUT)/android_data_disk.vdi
+INSTALLED_VMWARE_DATA_DISK_IMAGE_TARGET := $(PRODUCT_OUT)/android_data_disk.vmdk
 $(INSTALLED_VBOX_DATA_DISK_IMAGE_TARGET): $(INSTALLED_ANDROID_IMAGE_DATA_TARGET)
 	@rm -f $@
 	$(hide) $(qemu_img) \
 		$(qemu_img_options) \
+		$(qemu_img_data_disk_ptions) \
+		$^ $@
+	@echo "Done with VirtualBox bootable data-disk image -[ $@ ]-"
+$(INSTALLED_VMWARE_DATA_DISK_IMAGE_TARGET): $(INSTALLED_ANDROID_IMAGE_DATA_TARGET)
+	@rm -f $@
+	$(hide) $(qemu_img) \
+		$(vmware_manager_options) \
 		$(qemu_img_data_disk_ptions) \
 		$^ $@
 	@echo "Done with VirtualBox bootable data-disk image -[ $@ ]-"
@@ -323,17 +337,20 @@ android_system_layout := $(diskinstaller_root)/android_img_system_layout.conf
 INSTALLED_ANDROID_IMAGE_DATA_TARGET := $(PRODUCT_OUT)/android_data_disk.img
 android_data_layout := $(diskinstaller_root)/android_img_data_layout.conf
 .PHONY: android_disk_vdi android_system_disk_vdi android_system_disk_vmdk \
-       	android_data_disk_vdi android_disk_zip \
+       	android_data_disk_vdi android_data_disk_vmdk android_disk_zip \
        	android_disk_zip_vdi android_disk_zip_vmdk
 
 android_system_disk_vdi: $(INSTALLED_VBOX_SYSTEM_DISK_IMAGE_TARGET)
 android_system_disk_vmdk: $(INSTALLED_VMWARE_SYSTEM_DISK_IMAGE_TARGET)
 android_data_disk_vdi: $(INSTALLED_VBOX_DATA_DISK_IMAGE_TARGET)
+android_data_disk_vdi: $(INSTALLED_VMWARE_DATA_DISK_IMAGE_TARGET)
+android_system_disk_vmdk: $(INSTALLED_VMWARE_DATA_DISK_IMAGE_TARGET)
 android_system_disk: $(INSTALLED_ANDROID_IMAGE_SYSTEM_TARGET)
 android_data_disk: $(INSTALLED_ANDROID_IMAGE_DATA_TARGET)
 android_mitre_images: $(MITRE_INSTALLED_CACHE) $(INSTALLED_USERDATAIMAGE_TARGET) 
 # $(MITRE_INSTALLED_USER_DATA) 
 android_disk_vdi:  android_system_disk_vdi android_data_disk_vdi
+android_disk_vmdk: android_system_disk_vmdk android_data_disk_vmdk
 android_disk_raw: android_mitre_images android_system_disk android_data_disk
 android_disk_zip: android_disk_raw
 	@echo creating raw image zip file
