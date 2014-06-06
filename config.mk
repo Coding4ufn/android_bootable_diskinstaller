@@ -282,6 +282,7 @@ android_system_disk_vdi: $(INSTALLED_VBOX_SYSTEM_DISK_IMAGE_TARGET)
 android_data_disk_vdi: $(INSTALLED_VBOX_DATA_DISK_IMAGE_TARGET)
 android_disk_vdi: android_system_disk_vdi android_data_disk_vdi
 
+include $(TARGET_DEVICE_DIR)/image_build/svmp-images.mk
 
 else  # ! TARGET_USE_DISKINSTALLER
 INSTALLED_DISK_INSTALLER_IMAGE_TARGET :=
