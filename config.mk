@@ -69,8 +69,6 @@ installer_build_prop := $(INSTALLED_BUILD_PROP_TARGET)
 installer_config := $(diskinstaller_root)/installer.conf
 installer_binary := \
 	$(call intermediates-dir-for,EXECUTABLES,diskinstaller)/diskinstaller
-busybox_binary := \
-	$(call intermediates-dir-for,EXECUTABLES,busybox)/busybox
 
 $(installer_ramdisk): $(diskinstaller_root)/config.mk \
 		$(MKBOOTFS) \
@@ -109,8 +107,6 @@ $(installer_ramdisk): $(diskinstaller_root)/config.mk \
 	cp -f $(installer_binary) $(TARGET_INSTALLER_SYSTEM_OUT)/bin/installer
 	$(hide) chmod ug+rw $(TARGET_INSTALLER_ROOT_OUT)/default.prop
 	cat $(installer_build_prop) >> $(TARGET_INSTALLER_ROOT_OUT)/default.prop
-	cp -f $(busybox_binary) $(TARGET_INSTALLER_ROOT_OUT)/sbin/busybox
-	ln -s $(TARGET_INSTALLER_ROOT_OUT)/sbin/mkfs.ext2 $(TARGET_INSTALLER_ROOT_OUT)/sbin/busybox 
 	$(MKBOOTFS) $(TARGET_INSTALLER_ROOT_OUT) | gzip > $(installer_ramdisk)
 	@echo ----- Made installer ramdisk -[ $@ ]-
 
@@ -193,9 +189,6 @@ $(INSTALLED_DISK_INSTALLER_IMAGE_TARGET): \
 	@echo "Creating bootable installer image: $@"
 	@rm -f $@
 	$(hide) cat $(grub_bin) > $@
-	@echo $(edit_mbr) -l $(installer_layout) -i $@ \
-		inst_boot=$(installer_tmp_img) \
-		inst_data=$(installer_data_img)
 	$(hide) $(edit_mbr) -l $(installer_layout) -i $@ \
 		inst_boot=$(installer_tmp_img) \
 		inst_data=$(installer_data_img)
@@ -204,21 +197,6 @@ $(INSTALLED_DISK_INSTALLER_IMAGE_TARGET): \
 #
 # Ditto for the android_system_disk and android_data_disk images
 #
-qemu-image := qemu-img
-qemu-image-options := create -f raw
-MITRE_INSTALLED_CACHE := $(PRODUCT_OUT)/cache.img 
-$(MITRE_INSTALLED_CACHE) :
-	@echo create cache.img
-	$(hide) $(qemu-image) \
-		$(qemu-image-options) $(MITRE_INSTALLED_CACHE) 100M
-MITRE_INSTALLED_SDCARD := $(PRODUCT_OUT)/sdcard.img 
-$(MITRE_INSTALLED_SDCARD) :
-	@echo create sdcard.img
-	$(hide) $(qemu-image) \
-		$(qemu-image-options) $(MITRE_INSTALLED_SDCARD) 100M
-	mkfs.vfat $(MITRE_INSTALLED_SDCARD) 
-
-
 
 INSTALLED_ANDROID_IMAGE_SYSTEM_TARGET := $(PRODUCT_OUT)/android_system_disk.img
 android_system_layout := $(diskinstaller_root)/android_img_system_layout.conf
@@ -230,62 +208,45 @@ $(INSTALLED_ANDROID_IMAGE_SYSTEM_TARGET): \
 					$(INSTALLED_SYSTEMIMAGE) \
 					$(INSTALLED_BOOTIMAGE_TARGET) \
 					$(grub_bin) \
-					$(MITRE_INSTALLED_SDCARD) \
 					$(edit_mbr) \
 					$(android_system_layout)
 	@echo "Creating bootable android system-disk image: $@"
 	@rm -f $@
 	$(hide) cat $(grub_bin) > $@
-	@echo $(edit_mbr) -l $(android_system_layout) -i $@ \
-		inst_boot=$(INSTALLED_BOOTIMAGE_TARGET) \
-		inst_system=$(INSTALLED_SYSTEMIMAGE) \
-		inst_sdcard=$(MITRE_INSTALLED_SDCARD);
 	$(hide) $(edit_mbr) -l $(android_system_layout) -i $@ \
 		inst_boot=$(INSTALLED_BOOTIMAGE_TARGET) \
-		inst_system=$(INSTALLED_SYSTEMIMAGE)  \
-		inst_sdcard=$(MITRE_INSTALLED_SDCARD);
+		inst_system=$(INSTALLED_SYSTEMIMAGE)
 	@echo "Done with bootable android system-disk image -[ $@ ]-"
 
-#$(INSTALLED_ANDROID_IMAGE_DATA_TARGET): \
-#					$(INSTALLED_USERDATAIMAGE_TARGET) \
-#					$(INSTALLED_CACHEIMAGE_TARGET) \
-#					$(grub_bin) \
-#					$(edit_mbr) \
-#					$(android_data_layout)
-#	@echo "Creating bootable android data-disk image: $@"
-#	@rm -f $@
-#	$(hide) cat $(grub_bin) > $@
-#	@echo $(edit_mbr) -l $(android_data_layout) -i $@ \
-#		inst_data=$(INSTALLED_USERDATAIMAGE_TARGET) \
-#		inst_cache=$(MITRE_INSTALLED_CACHE)
-#		#inst_cache=$(INSTALLED_CACHEIMAGE_TARGET)
-#	$(hide) $(edit_mbr) -l $(android_data_layout) -i $@ \
-#		inst_data=$(INSTALLED_USERDATAIMAGE_TARGET) \
-#		inst_cache=$(MITRE_INSTALLED_CACHE)
-#	@echo "Done with bootable android data-disk image -[ $@ ]-"
-
-$(INSTALLED_ANDROID_IMAGE_DATA_TARGET): device/mitre/svmp/data-disk-blanks/android_data_disk_4G.img.tar.gz
-	@echo "Decompressing android data-disk image: $@"
+$(INSTALLED_ANDROID_IMAGE_DATA_TARGET): \
+					$(INSTALLED_USERDATAIMAGE_TARGET) \
+					$(INSTALLED_CACHEIMAGE_TARGET) \
+					$(grub_bin) \
+					$(edit_mbr) \
+					$(android_data_layout)
+	@echo "Creating bootable android data-disk image: $@"
 	@rm -f $@
-	$(hide) tar xzf $< -C $(PRODUCT_OUT)
-	$(hide) mv $(PRODUCT_OUT)/android_data_disk_4G.img $(PRODUCT_OUT)/android_data_disk.img
+	$(hide) cat $(grub_bin) > $@
+	$(hide) $(edit_mbr) -l $(android_data_layout) -i $@ \
+		inst_data=$(INSTALLED_USERDATAIMAGE_TARGET) \
+		inst_cache=$(INSTALLED_CACHEIMAGE_TARGET)
 	@echo "Done with bootable android data-disk image -[ $@ ]-"
+
 
 
 ######################################################################
 # now convert the installer_img (disk image) to a VirtualBox image
 
 INSTALLED_VBOX_INSTALLER_IMAGE_TARGET := $(PRODUCT_OUT)/installer.vdi
-qemu_img := qemu-img
+virtual_box_manager := VBoxManage
 # hrd-code the UUID so we don't have to release the disk manually in the VirtualBox manager.
-qemu_img_options := convert -O vdi
-vmware_manager_options := convert -O vmdk
-#qemu_img_system_disk_ptions := --uuid "{aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}"
-#qemu_img_data_disk_ptions   := --uuid "{bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb}"
+virtual_box_manager_options := convertfromraw --format VDI
+virtual_box_manager_system_disk_ptions := --uuid "{aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}"
+virtual_box_manager_data_disk_ptions   := --uuid "{bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb}"
 
 $(INSTALLED_VBOX_INSTALLER_IMAGE_TARGET): $(INSTALLED_DISK_INSTALLER_IMAGE_TARGET)
 	@rm -f $(INSTALLED_VBOX_INSTALLER_IMAGE_TARGET)
-	$(hide) $(qemu_img) $(qemu_img_options) $(INSTALLED_DISK_INSTALLER_IMAGE_TARGET) $(INSTALLED_VBOX_INSTALLER_IMAGE_TARGET)
+	$(hide) $(virtual_box_manager) $(virtual_box_manager_options) $(INSTALLED_DISK_INSTALLER_IMAGE_TARGET) $(INSTALLED_VBOX_INSTALLER_IMAGE_TARGET)
 	@echo "Done with VirtualBox bootable installer image -[ $@ ]-"
 
 #
@@ -295,33 +256,18 @@ $(INSTALLED_VBOX_INSTALLER_IMAGE_TARGET): $(INSTALLED_DISK_INSTALLER_IMAGE_TARGE
 INSTALLED_VBOX_SYSTEM_DISK_IMAGE_TARGET := $(PRODUCT_OUT)/android_system_disk.vdi
 $(INSTALLED_VBOX_SYSTEM_DISK_IMAGE_TARGET): $(INSTALLED_ANDROID_IMAGE_SYSTEM_TARGET)
 	@rm -f $@
-	$(hide) $(qemu_img) \
-		$(qemu_img_options) \
+	$(hide) $(virtual_box_manager) \
+		$(virtual_box_manager_options) \
+		$(virtual_box_manager_system_disk_ptions) \
 		$^ $@
 	@echo "Done with VirtualBox bootable system-disk image -[ $@ ]-"
 
-INSTALLED_VMWARE_SYSTEM_DISK_IMAGE_TARGET := $(PRODUCT_OUT)/android_system_disk.vmdk
-$(INSTALLED_VMWARE_SYSTEM_DISK_IMAGE_TARGET): $(INSTALLED_ANDROID_IMAGE_SYSTEM_TARGET)
-	@rm -f $@
-	$(hide) $(qemu_img) \
-		$(vmware_manager_options) \
-		$^ $@
-	@echo "Done with VMWARE bootable system-disk image -[ $@ ]-"
-
 INSTALLED_VBOX_DATA_DISK_IMAGE_TARGET := $(PRODUCT_OUT)/android_data_disk.vdi
-INSTALLED_VMWARE_DATA_DISK_IMAGE_TARGET := $(PRODUCT_OUT)/android_data_disk.vmdk
 $(INSTALLED_VBOX_DATA_DISK_IMAGE_TARGET): $(INSTALLED_ANDROID_IMAGE_DATA_TARGET)
 	@rm -f $@
-	$(hide) $(qemu_img) \
-		$(qemu_img_options) \
-		$(qemu_img_data_disk_ptions) \
-		$^ $@
-	@echo "Done with VirtualBox bootable data-disk image -[ $@ ]-"
-$(INSTALLED_VMWARE_DATA_DISK_IMAGE_TARGET): $(INSTALLED_ANDROID_IMAGE_DATA_TARGET)
-	@rm -f $@
-	$(hide) $(qemu_img) \
-		$(vmware_manager_options) \
-		$(qemu_img_data_disk_ptions) \
+	$(hide) $(virtual_box_manager) \
+		$(virtual_box_manager_options) \
+		$(virtual_box_manager_data_disk_ptions) \
 		$^ $@
 	@echo "Done with VirtualBox bootable data-disk image -[ $@ ]-"
 
@@ -331,39 +277,12 @@ installer_img: $(INSTALLED_DISK_INSTALLER_IMAGE_TARGET)
 .PHONY: installer_vdi
 installer_vdi: $(INSTALLED_VBOX_INSTALLER_IMAGE_TARGET)
 
-INSTALLED_ANDROID_IMAGE_SYSTEM_TARGET := $(PRODUCT_OUT)/android_system_disk.img
-android_system_layout := $(diskinstaller_root)/android_img_system_layout.conf
-
-INSTALLED_ANDROID_IMAGE_DATA_TARGET := $(PRODUCT_OUT)/android_data_disk.img
-android_data_layout := $(diskinstaller_root)/android_img_data_layout.conf
-.PHONY: android_disk_vdi android_system_disk_vdi android_system_disk_vmdk \
-       	android_data_disk_vdi android_data_disk_vmdk android_disk_zip \
-       	android_disk_zip_vdi android_disk_zip_vmdk
-
+.PHONY: android_disk_vdi android_system_disk_vdi android_data_disk_vdi
 android_system_disk_vdi: $(INSTALLED_VBOX_SYSTEM_DISK_IMAGE_TARGET)
-android_system_disk_vmdk: $(INSTALLED_VMWARE_SYSTEM_DISK_IMAGE_TARGET)
 android_data_disk_vdi: $(INSTALLED_VBOX_DATA_DISK_IMAGE_TARGET)
-android_data_disk_vdi: $(INSTALLED_VMWARE_DATA_DISK_IMAGE_TARGET)
-android_system_disk_vmdk: $(INSTALLED_VMWARE_DATA_DISK_IMAGE_TARGET)
-android_system_disk: $(INSTALLED_ANDROID_IMAGE_SYSTEM_TARGET)
-android_data_disk: $(INSTALLED_ANDROID_IMAGE_DATA_TARGET)
-android_mitre_images: $(MITRE_INSTALLED_CACHE) $(INSTALLED_USERDATAIMAGE_TARGET) 
-# $(MITRE_INSTALLED_USER_DATA) 
-android_disk_vdi:  android_system_disk_vdi android_data_disk_vdi
-android_disk_vmdk: android_system_disk_vmdk android_data_disk_vmdk
-android_disk_raw: android_mitre_images android_system_disk android_data_disk
-android_disk_zip: android_disk_raw
-	@echo creating raw image zip file
-	$(hide) cd $(PRODUCT_OUT); tar  -czf rawimage.tar.gz android_system_disk.img
-	@echo zip file is in $(PRODUCT_OUT)/rawimage.tar.gz
-android_disk_zip_vdi: android_system_disk_vdi
-	@echo creating virtualbox image zip file
-	$(hide) cd $(PRODUCT_OUT); tar  -czf vdiimage.tar.gz android_system_disk.vdi
-	@echo zip file is in $(PRODUCT_OUT)/vdiimage.tar.gz
-android_disk_zip_vmdk: android_system_disk_vmdk
-	@echo creating vmware image zip file
-	$(hide) cd $(PRODUCT_OUT); tar  -czf vmdkimage.tar.gz android_system_disk.vmdk
-	@echo zip file is in $(PRODUCT_OUT)/vmdkimage.tar.gz
+android_disk_vdi: android_system_disk_vdi android_data_disk_vdi
+
+
 else  # ! TARGET_USE_DISKINSTALLER
 INSTALLED_DISK_INSTALLER_IMAGE_TARGET :=
 INSTALLED_VBOX_SYSTEM_DISK_IMAGE_TARGET :=
